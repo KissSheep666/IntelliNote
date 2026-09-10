@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 智能笔记</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 720px; margin: 0 auto; padding: 24px; color: #333; background: #f7f8fa; }
+  h1 { font-size: 24px; }
+  section { background: #fff; border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 10px; font-family: inherit; }
+  textarea { min-height: 80px; resize: vertical; }
+  button { background: #4f6ef7; color: #fff; border: none; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #3d5ae0; }
+  .note { border: 1px solid #eee; border-radius: 10px; padding: 14px; margin: 10px 0; }
+  .note-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .note-content { margin: 8px 0; color: #555; white-space: pre-wrap; }
+  .note-summary { background: #f0f4ff; border-radius: 8px; padding: 10px; color: #3d5ae0; margin-top: 8px; }
+  .empty, .hint { color: #999; font-size: 14px; }
+  .err { color: #d33; }
+</style>
+</head>
+<body>
+<h1>🤖 AI 智能笔记</h1>
+
+<section>
+  <h2>① 新建一条笔记</h2>
+  <input id="noteTitle" placeholder="标题(可省略)">
+  <textarea id="noteContent" placeholder="写点正文内容..."></textarea>
+  <button onclick="createNote()">创建笔记</button>
+</section>
+
+<section>
+  <h2>② 我的笔记</h2>
+  <button onclick="loadNotes()">刷新列表</button>
+  <div id="noteList"><p class="hint">点「刷新列表」加载笔记</p></div>
+</section>
+
+<section>
+  <h2>③ 对任意文字做 AI 总结</h2>
+  <textarea id="freeText" placeholder="粘贴一段文字,让 AI 用一句话总结"></textarea>
+  <button onclick="summarizeText()">AI 总结</button>
+  <div id="freeResult"></div>
+</section>
+
+<script>
+  // 防止用户输入的内容里有 < > 等字符破坏页面(顺便学个概念:XSS 防护)
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ① 创建笔记:POST /api/notes
+  async function createNote() {
+    const title = document.getElementById('noteTitle').value.trim();
+    const content = document.getElementById('noteContent').value.trim();
+    if (!content) { alert('正文不能为空'); return; }
+    const res = await fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, content })
+    });
+    if (!res.ok) { alert('创建失败'); return; }
+    document.getElementById('noteTitle').value = '';
+    document.getElementById('noteContent').value = '';
+    loadNotes();
+  }
+
+  // ② 加载笔记列表:GET /api/notes
+  async function loadNotes() {
+    const res = await fetch('/api/notes');
+    const notes = await res.json();
+    const list = document.getElementById('noteList');
+    if (notes.length === 0) {
+      list.innerHTML = '<p class="empty">还没有笔记,去上面创建一条吧</p>';
+      return;
+    }
+    list.innerHTML = notes.map(n => `
+      <div class="note">
+        <div class="note-head">
+          <strong>#${n.id} ${escapeHtml(n.title || '(无标题)')}</strong>
+          <button onclick="summarizeNote(${n.id})">AI 总结</button>
+        </div>
+        <div class="note-content">${escapeHtml(n.content)}</div>
+        ${n.aiSummary ? `<div class="note-summary">✨ ${escapeHtml(n.aiSummary)}</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // 对某条笔记做 AI 总结:POST /api/notes/{id}/summarize
+  async function summarizeNote(id) {
+    const res = await fetch('/api/notes/' + id + '/summarize', { method: 'POST' });
+    const note = await res.json();
+    if (note.aiSummary) { loadNotes(); }
+    else { alert('总结失败:' + JSON.stringify(note)); }
+  }
+
+  // ③ 对任意文字做 AI 总结:POST /api/ai/summarize
+  async function summarizeText() {
+    const text = document.getElementById('freeText').value.trim();
+    if (!text) { alert('请先粘贴文字'); return; }
+    const result = document.getElementById('freeResult');
+    result.innerHTML = '<p class="hint">⏳ AI 总结中...</p>';
+    const res = await fetch('/api/ai/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.summary) {
+      result.innerHTML = '<div class="note-summary">✨ ' + escapeHtml(data.summary) + '</div>';
+    } else {
+      result.innerHTML = '<p class="err">出错了:' + escapeHtml(JSON.stringify(data)) + '</p>';
+    }
+  }
+
+  // 页面打开时自动加载一次
+  loadNotes();
+</script>
+</body>
+</html>
