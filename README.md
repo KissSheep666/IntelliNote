@@ -9,8 +9,11 @@
 ```
 ai-note/
 ├── pom.xml                 # 依赖清单(只引了 spring-boot-starter-web)
-├── application.properties  # 配置(DeepSeek 的 key 填这里)
-└── src/main/java/com/example/ainote/
+└── src/main/
+    ├── resources/
+    │   ├── application.properties  # 配置(DeepSeek 的 key 填这里,由 .example 复制而来)
+    │   └── static/index.html       # 前端页面
+    └── java/com/example/ainote/
     ├── AiNoteApplication.java   # 启动入口
     ├── controller/
     │   ├── NoteController.java  # 笔记接口
