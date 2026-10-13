@@ -72,7 +72,25 @@ public class NoteController {
         return note;
     }
 
-    /** 删除一条笔记: delete /api/notes/{id} */
+    /** 更新笔记: PUT /api/notes/{id} */
+    @PutMapping("/{id}")
+    public Note updateNote(@PathVariable Long id, @RequestBody Note note){
+        //通过id查询原笔记
+        Note originalNote = noteService.get(id);
+        //判断原笔记是否为空 update修改的前提原数据必须在库中
+        if(originalNote == null){
+            throw new RuntimeException("原笔记" + id + "不存在 无法修改");
+        }
+
+        //为修改后的笔记赋id值
+        note.setId(id); //前端不会传id到body中
+
+        //返回的还是原本传入的note 若数据库对字段有更新无法获取: return noteService.updateNote(note);
+        noteService.update(note);   //先更新数据库
+        return noteService.get(id); //再重新查找笔记
+    }
+
+    /** 删除一条笔记: DELETE /api/notes/{id} */
     @DeleteMapping("/{id}")
     public void deleteNote(@PathVariable Long id){
         noteService.deleteNote(id);
